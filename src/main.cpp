@@ -7,14 +7,17 @@
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 
-// Broches capteur ultrason
-#define PIN_TRIG    2
-#define PIN_ECHO    4
+// Capteur ultrasons HC-SR04
+#define PIN_TRIG    7
+#define PIN_ECHO    8
 
+// Bouton Grove v1.3
 #define PIN_BOUTON  3
-#define PIN_SERVO   9
 
-#define DISTANCE_SEUIL_CM 5 // Déclenche à moins de 5 cm
+// Servomoteur
+#define PIN_SERVO   5
+
+#define DISTANCE_SEUIL_CM 5 // Déclenchement à moins de 5 cm
 #define STOCK_INITIAL     10
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
@@ -23,18 +26,15 @@ Servo pushServo;
 int stock = STOCK_INITIAL;
 
 long mesurerDistanceCm() {
-  // Envoi d'une impulsion de 10 µs sur Trig
   digitalWrite(PIN_TRIG, LOW);
   delayMicroseconds(2);
   digitalWrite(PIN_TRIG, HIGH);
   delayMicroseconds(10);
   digitalWrite(PIN_TRIG, LOW);
 
-  // Lecture du temps de retour de l'écho en µs
-  long duree = pulseIn(PIN_ECHO, HIGH, 30000); // Timeout à 30 ms (~5 m max)
-  
-  if (duree == 0) return 999; // Pas d'obstacle détecté
-  return duree * 0.034 / 2;    // Vitesse du son : 340 m/s
+  long duree = pulseIn(PIN_ECHO, HIGH, 30000); // Timeout à 30 ms
+  if (duree == 0) return 999;
+  return duree * 0.034 / 2;
 }
 
 void majEcran() {
@@ -49,7 +49,7 @@ void majEcran() {
     display.print("Stock: ");
     display.print(stock);
   } else {
-    display.print("CHEH");
+    display.print("VIDE !");
   }
   display.display();
 }
@@ -57,7 +57,9 @@ void majEcran() {
 void setup() {
   pinMode(PIN_TRIG, OUTPUT);
   pinMode(PIN_ECHO, INPUT);
-  pinMode(PIN_BOUTON, INPUT_PULLUP);
+  
+  // Le module Grove Button intègre déjà sa propre résistance, un simple INPUT suffit
+  pinMode(PIN_BOUTON, INPUT);
 
   pushServo.attach(PIN_SERVO);
   pushServo.write(0); // Position repos
@@ -67,30 +69,30 @@ void setup() {
 }
 
 void loop() {
-  // Réarmement du stock avec le bouton
-  if (digitalRead(PIN_BOUTON) == LOW) {
+  // Réarmement du stock lors de l'appui sur le bouton Grove (envoie HIGH à l'appui)
+  if (digitalRead(PIN_BOUTON) == HIGH) {
     stock = STOCK_INITIAL;
     majEcran();
-    delay(300);
+    delay(300); // Anti-rebond
   }
 
-  // Mesure de distance
+  // Mesure de la distance du capteur ultrasons
   long distance = mesurerDistanceCm();
 
-  // Si un obstacle est détecté à moins de 10 cm
+  // Si la main passe à moins de 10 cm et qu'il reste du stock
   if (distance > 0 && distance <= DISTANCE_SEUIL_CM && stock > 0) {
-    // Action du servo (pousse puis revient)
-    pushServo.write(90);
+    // Action du moteur push (servomoteur)
+    pushServo.write(90); // Pousse
     delay(400);
-    pushServo.write(0);
+    pushServo.write(0);  // Revient
     delay(400);
 
     stock--;
     majEcran();
 
-    // Délai d'attente pour retirer la main sans re-déclencher
+    // Pause pour laisser le temps de retirer la main
     delay(1500);
   }
 
-  delay(60); // Cadence de mesure stable
-}
+  delay(60);
+} 
