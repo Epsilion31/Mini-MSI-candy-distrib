@@ -1,4 +1,4 @@
-#include <Arduino.h>
+#include <Arduino.h>// c'est pour que l'IDE Arduino reconnaisse le code comme un sketch Arduino
 #include <Wire.h>
 #include <Servo.h>
 #include "rgb_lcd.h"
@@ -16,8 +16,8 @@
 #define DISTANCE_SEUIL_CM 5
 #define STOCK_INITIAL     10
 
-rgb_lcd lcd;
-Servo pushServo;
+rgb_lcd lcd; //c'est l'objet qui représente l'écran LCD RGB
+Servo pushServo; //c'est l'objet qui représente le servomoteur
 
 int stock = STOCK_INITIAL;
 
