@@ -7,16 +7,35 @@
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 
-#define PIN_CAPTEUR 2
+// Broches capteur ultrason
+#define PIN_TRIG    2
+#define PIN_ECHO    4
+
 #define PIN_BOUTON  3
 #define PIN_SERVO   9
 
-#define STOCK_INITIAL 10
+#define DISTANCE_SEUIL_CM 5 // Déclenche à moins de 5 cm
+#define STOCK_INITIAL     10
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 Servo pushServo;
 
 int stock = STOCK_INITIAL;
+
+long mesurerDistanceCm() {
+  // Envoi d'une impulsion de 10 µs sur Trig
+  digitalWrite(PIN_TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(PIN_TRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(PIN_TRIG, LOW);
+
+  // Lecture du temps de retour de l'écho en µs
+  long duree = pulseIn(PIN_ECHO, HIGH, 30000); // Timeout à 30 ms (~5 m max)
+  
+  if (duree == 0) return 999; // Pas d'obstacle détecté
+  return duree * 0.034 / 2;    // Vitesse du son : 340 m/s
+}
 
 void majEcran() {
   display.clearDisplay();
@@ -30,43 +49,48 @@ void majEcran() {
     display.print("Stock: ");
     display.print(stock);
   } else {
-    display.print("VIDE !");
+    display.print("CHEH");
   }
   display.display();
 }
 
 void setup() {
-  pinMode(PIN_CAPTEUR, INPUT);
+  pinMode(PIN_TRIG, OUTPUT);
+  pinMode(PIN_ECHO, INPUT);
   pinMode(PIN_BOUTON, INPUT_PULLUP);
 
   pushServo.attach(PIN_SERVO);
   pushServo.write(0); // Position repos
 
-  // Initialisation écran OLED (adresse 0x3C standard)
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   majEcran();
 }
 
 void loop() {
-  // Recharger le stock quand on presse le bouton
+  // Réarmement du stock avec le bouton
   if (digitalRead(PIN_BOUTON) == LOW) {
     stock = STOCK_INITIAL;
     majEcran();
-    delay(300); // Anti-rebond
+    delay(300);
   }
 
-  // Détection main (la plupart des modules IR passent à LOW quand ils détectent)
-  if (digitalRead(PIN_CAPTEUR) == LOW && stock > 0) {
-    // Mouvement de poussée
-    pushServo.write(90);  // Pousse
+  // Mesure de distance
+  long distance = mesurerDistanceCm();
+
+  // Si un obstacle est détecté à moins de 10 cm
+  if (distance > 0 && distance <= DISTANCE_SEUIL_CM && stock > 0) {
+    // Action du servo (pousse puis revient)
+    pushServo.write(90);
     delay(400);
-    pushServo.write(0);   // Revient
+    pushServo.write(0);
     delay(400);
 
     stock--;
     majEcran();
 
-    // Pause pour éviter de distribuer plusieurs fois de suite
+    // Délai d'attente pour retirer la main sans re-déclencher
     delay(1500);
   }
+
+  delay(60); // Cadence de mesure stable
 }
