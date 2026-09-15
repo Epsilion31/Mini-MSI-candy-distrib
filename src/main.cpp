@@ -78,7 +78,7 @@ void loop() {
     lcd.setRGB(0, 255, 0);
 
     pushServo.write(90);
-    delay(400);
+    delay(1000);
     pushServo.write(0);
     delay(400);
 
