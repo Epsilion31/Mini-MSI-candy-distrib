@@ -1,26 +1,22 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <Servo.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
+#include "rgb_lcd.h"
 
 // Capteur ultrasons HC-SR04
 #define PIN_TRIG    7
 #define PIN_ECHO    8
 
 // Bouton Grove v1.3
-#define PIN_BOUTON  3
+#define PIN_BOUTON  4
 
 // Servomoteur
 #define PIN_SERVO   5
 
-#define DISTANCE_SEUIL_CM 5 // Déclenchement à moins de 5 cm
+#define DISTANCE_SEUIL_CM 5
 #define STOCK_INITIAL     10
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+rgb_lcd lcd;
 Servo pushServo;
 
 int stock = STOCK_INITIAL;
@@ -32,67 +28,67 @@ long mesurerDistanceCm() {
   delayMicroseconds(10);
   digitalWrite(PIN_TRIG, LOW);
 
-  long duree = pulseIn(PIN_ECHO, HIGH, 30000); // Timeout à 30 ms
+  long duree = pulseIn(PIN_ECHO, HIGH, 30000);
   if (duree == 0) return 999;
   return duree * 0.034 / 2;
 }
 
 void majEcran() {
-  display.clearDisplay();
-  display.setTextSize(2);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(10, 10);
-  display.print("BONBONS");
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("BONBONS");
 
-  display.setCursor(10, 40);
+  lcd.setCursor(0, 1);
   if (stock > 0) {
-    display.print("Stock: ");
-    display.print(stock);
+    lcd.print("Stock: ");
+    lcd.print(stock);
   } else {
-    display.print("VIDE !");
+    lcd.print("VIDE !");
   }
-  display.display();
 }
 
 void setup() {
   pinMode(PIN_TRIG, OUTPUT);
   pinMode(PIN_ECHO, INPUT);
-  
-  // Le module Grove Button intègre déjà sa propre résistance, un simple INPUT suffit
   pinMode(PIN_BOUTON, INPUT);
 
   pushServo.attach(PIN_SERVO);
-  pushServo.write(0); // Position repos
+  pushServo.write(0);
 
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  // Initialisation du LCD (16 colonnes, 2 lignes)
+  lcd.begin(16, 2);
+  // Couleur du rétroéclairage (Rouge, Vert, Bleu)
+  lcd.setRGB(0, 128, 255); 
+  
   majEcran();
 }
 
 void loop() {
-  // Réarmement du stock lors de l'appui sur le bouton Grove (envoie HIGH à l'appui)
+  // Réarmement du stock avec le bouton
   if (digitalRead(PIN_BOUTON) == HIGH) {
     stock = STOCK_INITIAL;
     majEcran();
-    delay(300); // Anti-rebond
+    delay(300);
   }
 
-  // Mesure de la distance du capteur ultrasons
   long distance = mesurerDistanceCm();
 
-  // Si la main passe à moins de 10 cm et qu'il reste du stock
   if (distance > 0 && distance <= DISTANCE_SEUIL_CM && stock > 0) {
-    // Action du moteur push (servomoteur)
-    pushServo.write(90); // Pousse
+    // Changement de couleur pendant le service (Vert)
+    lcd.setRGB(0, 255, 0);
+
+    pushServo.write(90);
     delay(400);
-    pushServo.write(0);  // Revient
+    pushServo.write(0);
     delay(400);
 
     stock--;
     majEcran();
 
-    // Pause pour laisser le temps de retirer la main
+    // Retour à la couleur initiale (Bleu)
+    lcd.setRGB(0, 128, 255);
     delay(1500);
   }
 
   delay(60);
-} 
+}
